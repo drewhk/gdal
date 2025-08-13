@@ -110,6 +110,7 @@ geos = ["geos-sys"]
 
 internal_drivers = [
     # ogr internal,
+    "driver_ntv2",
     "driver_avc",
     "driver_cad",
     "driver_csv",
@@ -208,6 +209,14 @@ internal_drivers = [
     "driver_sdts",
     "driver_vrt",
     "driver_mem",
+    "driver_ntv2",
+    "driver_grass",
+    "driver_grassasciigrid",
+    "driver_gs7gb",
+    "driver_gsag",
+    "driver_gsbg",
+    "driver_gsc",
+    "driver_loslas",
 ]
 
 # ogr internal
@@ -306,6 +315,15 @@ driver_usgsdem = []
 driver_xpm = []
 driver_xyz = []
 driver_zmap = []
+driver_ntv2 = []
+driver_grass = []
+driver_grassasciigrid = []
+driver_gs7gb = []
+driver_gsag = []
+driver_gsbg = []
+driver_gsc = []
+driver_loslas = []
+
 
 # ogr and gdal
 driver_idrisi = []

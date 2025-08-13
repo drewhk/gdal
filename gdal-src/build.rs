@@ -194,6 +194,15 @@ fn main() {
     handle_gdal_driver!(config, "driver_vrt");
     handle_gdal_driver!(config, "driver_mem");
 
+    handle_gdal_driver!(config, "driver_ntv2");
+    handle_gdal_driver!(config, "driver_grass");
+    handle_gdal_driver!(config, "driver_grassasciigrid");
+    handle_gdal_driver!(config, "driver_gs7gb");
+    handle_gdal_driver!(config, "driver_gsag");
+    handle_gdal_driver!(config, "driver_gsbg");
+    handle_gdal_driver!(config, "driver_gsc");
+    handle_gdal_driver!(config, "driver_loslas");
+
     if cfg!(feature = "driver_sqlite") {
         let sqlite3_include_dir =
             std::env::var("DEP_SQLITE3_INCLUDE").expect("This is set by libsqlite3-sys");
