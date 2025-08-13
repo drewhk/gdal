@@ -217,6 +217,7 @@ internal_drivers = [
     "driver_gsbg",
     "driver_gsc",
     "driver_loslas",
+    "driver_nsgeoid",
 ]
 
 # ogr internal
@@ -323,6 +324,7 @@ driver_gsag = []
 driver_gsbg = []
 driver_gsc = []
 driver_loslas = []
+driver_nsgeoid = []
 
 
 # ogr and gdal

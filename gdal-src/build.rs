@@ -202,6 +202,7 @@ fn main() {
     handle_gdal_driver!(config, "driver_gsbg");
     handle_gdal_driver!(config, "driver_gsc");
     handle_gdal_driver!(config, "driver_loslas");
+    handle_gdal_driver!(config, "driver_nsgeoid");
 
     if cfg!(feature = "driver_sqlite") {
         let sqlite3_include_dir =
