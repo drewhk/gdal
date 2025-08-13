@@ -71,7 +71,7 @@ geos-src = { version = "0.2.3", optional = true }
 cmake = "0.1.50"
 
 [features]
-default = []
+default = ["internal_drivers"]
 # force not building this crate
 nobuild = ["proj-sys/nobuild"]
 
