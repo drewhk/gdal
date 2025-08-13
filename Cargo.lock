@@ -1039,8 +1039,7 @@ dependencies = [
 [[package]]
 name = "proj-sys"
 version = "0.26.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a208129995443a4c475464c33308274be1578993b0ad266c9139188ed0dc7e91"
+source = "git+https://github.com/drewhk/proj?branch=bundled-sqlite#440fd2ddd47a883bdb846fc197dc44a7c219ecc8"
 dependencies = [
  "cmake",
  "flate2",
