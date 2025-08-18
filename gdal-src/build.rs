@@ -75,7 +75,9 @@ fn main() {
 
     config
         .define("GDAL_BUILD_OPTIONAL_DRIVERS", "ON")
-        .define("OGR_BUILD_OPTIONAL_DRIVERS", "OFF")
+        .define("OGR_BUILD_OPTIONAL_DRIVERS", "ON")
+        .define("GDAL_ENABLE_DRIVER_RAW", "ON")
+        .define("GDAL_ENABLE_DRIVER_AAIGRID", "ON")
         .define("GDAL_USE_INTERNAL_LIBS", "ON")
         .define("GDAL_USE_EXTERNAL_LIBS", "OFF")
         .define("BUILD_SHARED_LIBS", "OFF")
