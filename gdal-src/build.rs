@@ -74,7 +74,7 @@ fn main() {
     let mut config = cmake::Config::new("source");
 
     config
-        .define("GDAL_BUILD_OPTIONAL_DRIVERS", "OFF")
+        .define("GDAL_BUILD_OPTIONAL_DRIVERS", "ON")
         .define("OGR_BUILD_OPTIONAL_DRIVERS", "OFF")
         .define("GDAL_USE_INTERNAL_LIBS", "ON")
         .define("GDAL_USE_EXTERNAL_LIBS", "OFF")
