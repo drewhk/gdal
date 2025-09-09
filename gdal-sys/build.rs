@@ -6,7 +6,6 @@ use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
-#[cfg(feature = "bindgen")]
 pub fn write_bindings(include_paths: Vec<String>, out_path: &Path) {
     // To generate the bindings manually, use
     // bindgen --constified-enum-module ".*" --ctypes-prefix ::std::ffi --allowlist-function "(CPL|CSL|GDAL|OGR|OSR|OCT|VSI).*" wrapper.h -- $(pkg-config --cflags-only-I gdal) -fretain-comments-from-system-headers
@@ -31,6 +30,28 @@ pub fn write_bindings(include_paths: Vec<String>, out_path: &Path) {
             .clang_arg("-I")
             .clang_arg(path)
             .clang_arg("-fretain-comments-from-system-headers");
+    }
+
+    let ndk_path = env::var("ANDROID_NDK").expect("ANDROID_NDK not set");
+    let target = env::var("TARGET").expect("TARGET not set");
+    let host = env::var("HOST").expect("OS not set");
+    let host_parts: Vec<&str> = host.split("-").collect();
+
+    if target.contains("android") {
+        let llvm_bindir = format!("{}/toolchains/llvm/prebuilt/{}-{}/bin", ndk_path, std::env::consts::OS, host_parts[0]);
+
+        eprintln!("LIBCLANG_PATH={}", llvm_bindir);
+        eprintln!("sysroot={}", llvm_bindir.replace("/bin", ""));
+
+        println!("cargo:rustc-env=LIBCLANG_PATH={}", llvm_bindir);
+        println!("cargo:rustc-env=CLANG_PATH={}", llvm_bindir);
+        println!("cargo:rerun-if-changed=wrapper.h");
+
+        builder = builder
+            .clang_arg(format!("--target={}", target))
+            .clang_arg(format!("--sysroot={}/sysroot", llvm_bindir.replace("/bin", "")))
+            .clang_arg(format!("-I{}/sysroot/usr/include", llvm_bindir.replace("/bin", "")))
+            .clang_arg(format!("-I{}/lib/clang/21/include", llvm_bindir.replace("/bin", "")))
     }
 
     builder
@@ -75,13 +96,16 @@ fn main() {
 
     let out_path = PathBuf::from(env::var("OUT_DIR").unwrap()).join("bindings.rs");
 
+    let target = std::env::var("TARGET").unwrap();
+    let use_bindgen = target.contains("android");
+
     // Hardcode a prebuilt binding version while generating docs.
     // Otherwise docs.rs will explode due to not actually having libgdal installed.
-    let use_latest = std::env::var("DOCS_RS").is_ok() || cfg!(feature = "bundled");
+    let use_latest = std::env::var("DOCS_RS").is_ok() || (cfg!(feature = "bundled") && !use_bindgen);
     let mut version = if use_latest {
         Version::parse("3.10.0").ok()
     } else {
-        env::var_os("GDAL_VERSION")
+        env::var_os("DEP_GDAL_SRC_GDAL_VERSION")
             .map(|vs| vs.to_string_lossy().to_string())
             .and_then(|vs| Version::parse(vs.trim()).ok())
     };
@@ -110,9 +134,9 @@ fn main() {
     let mut prefer_static =
         env::var_os("GDAL_STATIC").is_some() && env::var_os("GDAL_DYNAMIC").is_none();
 
-    let mut include_dir = env_dir("GDAL_INCLUDE_DIR");
-    let mut lib_dir = env_dir("GDAL_LIB_DIR");
-    let home_dir = env_dir("GDAL_HOME");
+    let mut include_dir = env_dir("DEP_GDAL_SRC_GDAL_INCLUDE_DIR");
+    let mut lib_dir = env_dir("DEP_GDAL_SRC_GDAL_LIB_DIR");
+    let home_dir = env_dir("DEP_GDAL_SRC_GDAL_HOME");
 
     let mut found = false;
     if cfg!(windows) {
@@ -120,9 +144,14 @@ fn main() {
         // works in windows-msvc and windows-gnu
         if let Some(ref lib_dir) = lib_dir {
             let lib_path = lib_dir.join("gdal_i.lib");
+            let android_lib_path = lib_dir.join("libgdal.a");
             if lib_path.exists() {
                 prefer_static = true;
                 lib_name = String::from("gdal_i");
+                found = true;
+            } else if android_lib_path.exists() {
+                prefer_static = true;
+                lib_name = String::from("gdal");
                 found = true;
             }
         }
@@ -130,10 +159,15 @@ fn main() {
             if let Some(ref home_dir) = home_dir {
                 let home_lib_dir = home_dir.join("lib");
                 let lib_path = home_lib_dir.join("gdal_i.lib");
+                let android_lib_path = home_lib_dir.join("libgdal.a");
                 if lib_path.exists() {
                     prefer_static = true;
                     lib_name = String::from("gdal_i");
                     lib_dir = Some(home_lib_dir);
+                    found = true;
+                } else if android_lib_path.exists() {
+                    prefer_static = true;
+                    lib_name = String::from("gdal");
                     found = true;
                 }
             }
@@ -157,7 +191,7 @@ fn main() {
     if let Some(ref home_dir) = home_dir {
         if include_dir.is_none() {
             let dir = home_dir.join("include");
-            if cfg!(feature = "bindgen") && !dir.exists() {
+            if use_bindgen && !dir.exists() {
                 panic!(
                     "bindgen was enabled, but GDAL_INCLUDE_DIR was not set and {} doesn't exist.",
                     dir.display()
@@ -230,11 +264,9 @@ fn main() {
         println!("cargo:version_number={gdal_version_number_string}");
     }
 
-    #[cfg(feature = "bindgen")]
-    write_bindings(include_paths, &out_path);
-
-    #[cfg(not(feature = "bindgen"))]
-    {
+    if use_bindgen {
+        write_bindings(include_paths, &out_path);
+    } else {
         if let Some(version) = version {
             let bindings_path = prebuilt_bindings_path(&version);
 

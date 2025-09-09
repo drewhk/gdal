@@ -151,7 +151,7 @@ impl<'a> MDArray<'a> {
         let array_step: *const i64 = std::ptr::null();
         // If set to nullptr, will be set so that pDstBuffer is written in a compact way,
         // with elements of the last / fastest varying dimension being consecutive.
-        let buffer_stride: *const i64 = std::ptr::null();
+        let buffer_stride: *const gdal_sys::GPtrDiff_t = std::ptr::null();
         let p_dst_buffer_alloc_start: *mut c_void = std::ptr::null_mut();
         let n_dst_buffer_alloc_size = 0;
 
@@ -300,7 +300,7 @@ impl<'a> MDArray<'a> {
         let array_step: *const i64 = std::ptr::null();
         // If set to nullptr, will be set so that pDstBuffer is written in a compact way,
         // with elements of the last / fastest varying dimension being consecutive.
-        let buffer_stride: *const i64 = std::ptr::null();
+        let buffer_stride: *const gdal_sys::GPtrDiff_t = std::ptr::null();
 
         let p_dst_buffer_alloc_start: *mut c_void = std::ptr::null_mut();
         let n_dst_buffer_alloc_size = 0;

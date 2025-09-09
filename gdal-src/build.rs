@@ -1,4 +1,5 @@
 use std::path::PathBuf;
+use std::env;
 
 macro_rules! handle_ogr_driver {
     ($config: ident, $driver: literal) => {
@@ -74,6 +75,7 @@ fn main() {
     let mut config = cmake::Config::new("source");
 
     config
+        .define("BUILD_WITHOUT_64BIT_OFFSET", "ON")// Required for certain Android builds
         .define("GDAL_BUILD_OPTIONAL_DRIVERS", "ON")
         .define("OGR_BUILD_OPTIONAL_DRIVERS", "ON")
         .define("GDAL_ENABLE_DRIVER_RAW", "ON")
@@ -349,27 +351,37 @@ fn main() {
     let res = config.build();
 
     // sometimes it's lib and sometimes it's lib64 and sometimes `build/lib`
-    let lib_dir = res.join("lib64");
-    println!(
-        "cargo:rustc-link-search=native={}",
-        lib_dir.to_str().unwrap()
-    );
-    let lib_dir = res.join("lib");
-    println!(
-        "cargo:rustc-link-search=native={}",
-        lib_dir.to_str().unwrap()
-    );
-    let lib_dir = res.join("build").join("lib");
-    println!(
-        "cargo:rustc-link-search=native={}",
-        lib_dir.to_str().unwrap()
-    );
+    let possible_lib_dirs = [
+        res.join("lib"),
+        res.join("lib64"),
+        res.join("build").join("lib"),
+    ];
+
+    let lib_dir = possible_lib_dirs
+        .iter()
+        .find(|p| p.exists())
+        .expect("Could not find GDAL library directory");
+
+    // Tell Rust’s linker
+    println!("cargo:rustc-link-search=native={}", lib_dir.display());
 
     //gdal likes to create gdal_d when configured as debug and on MSVC, so link to that one if it exists
     if res.join("lib").join("gdald.lib").exists() {
         println!("cargo:rustc-link-lib=static=gdald");
     } else {
         println!("cargo:rustc-link-lib=static=gdal");
+    }
+
+    println!("cargo:GDAL_LIB_DIR={}", lib_dir.display());
+    println!("cargo:GDAL_HOME={}", res.display());
+    println!("cargo:GDAL_INCLUDE_DIR={}", res.join("include").display());
+
+    let crate_version = env::var("CARGO_PKG_VERSION").unwrap();
+
+    // gdal-src uses semver with a build suffix like "0.2.1+3.10.3"
+    // everything after the `+` is the actual GDAL version
+    if let Some((_, gdal_version)) = crate_version.split_once('+') {
+        println!("cargo:GDAL_VERSION={}", gdal_version);
     }
 }
 
