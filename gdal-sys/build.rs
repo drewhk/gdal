@@ -38,7 +38,15 @@ pub fn write_bindings(include_paths: Vec<String>, out_path: &Path) {
     let host_parts: Vec<&str> = host.split("-").collect();
 
     if target.contains("android") {
-        let llvm_bindir = format!("{}/toolchains/llvm/prebuilt/{}-{}/bin", ndk_path, std::env::consts::OS, host_parts[0]);
+        let os = std::env::consts::OS;
+        let llvm_bindir = if os == "macos" {
+            format!("{}/toolchains/llvm/prebuilt/darwin-x86_64/bin", ndk_path)
+        } else {
+            format!(
+                "{}/toolchains/llvm/prebuilt/{}-{}/bin",
+                ndk_path, os, host_parts[0]
+            )
+        };
 
         eprintln!("LIBCLANG_PATH={}", llvm_bindir);
         eprintln!("sysroot={}", llvm_bindir.replace("/bin", ""));
