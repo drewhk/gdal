@@ -55,11 +55,25 @@ pub fn write_bindings(include_paths: Vec<String>, out_path: &Path) {
         println!("cargo:rustc-env=CLANG_PATH={}", llvm_bindir);
         println!("cargo:rerun-if-changed=wrapper.h");
 
+        let triple = match target.as_str() {
+            t if t.contains("aarch64") => "aarch64-linux-android",
+            t if t.contains("armv7") => "arm-linux-androideabi",
+            t if t.contains("i686") => "i686-linux-android",
+            t if t.contains("x86_64") => "x86_64-linux-android",
+            _ => panic!("Unsupported Android target: {}", target),
+        };
+
+        let sysroot_base = llvm_bindir.replace("/bin", "");
+        let clang_include = format!("{}/lib/clang/21/include", sysroot_base);
+        let sysroot_triple_include = format!("{}/sysroot/usr/include/{}", sysroot_base, triple);
+
         builder = builder
             .clang_arg(format!("--target={}", target))
-            .clang_arg(format!("--sysroot={}/sysroot", llvm_bindir.replace("/bin", "")))
-            .clang_arg(format!("-I{}/sysroot/usr/include", llvm_bindir.replace("/bin", "")))
-            .clang_arg(format!("-I{}/lib/clang/21/include", llvm_bindir.replace("/bin", "")))
+            .clang_arg(format!("--sysroot={}/sysroot", sysroot_base))
+            .clang_arg(format!("-I{}/sysroot/usr/include", sysroot_base))
+            .clang_arg(format!("-I{}", sysroot_triple_include))
+            .clang_arg(format!("-I{}/asm", sysroot_triple_include))
+            .clang_arg(format!("-I{}", clang_include));
     }
 
     builder
