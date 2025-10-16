@@ -396,7 +396,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "976dd42dc7e85965fe702eb8164f21f450704bdde31faefd6471dba214cb594e"
 dependencies = [
  "libc",
- "windows-sys 0.59.0",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -707,7 +707,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fc2f4eb4bc735547cfed7c0a4922cbd04a4655978c09b54f1f7b228750664c34"
 dependencies = [
  "cfg-if",
- "windows-targets 0.52.6",
+ "windows-targets 0.48.5",
 ]
 
 [[package]]
@@ -1039,7 +1039,7 @@ dependencies = [
 [[package]]
 name = "proj-sys"
 version = "0.26.0"
-source = "git+https://github.com/drewhk/proj?branch=bundled-sqlite#45703b74ad758525a644e6c462923818b7aadf1b"
+source = "git+https://github.com/drewhk/proj?branch=bundled-sqlite#ff8f85a26f51b034c7ca8e79b54096f30f6bb5c4"
 dependencies = [
  "bindgen",
  "cmake",
@@ -1125,7 +1125,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys",
- "windows-sys 0.59.0",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -1222,7 +1222,7 @@ dependencies = [
  "getrandom 0.3.2",
  "once_cell",
  "rustix",
- "windows-sys 0.59.0",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
