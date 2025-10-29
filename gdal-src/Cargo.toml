@@ -49,7 +49,7 @@ include = [
 [dependencies]
 link-cplusplus = "1.0"
 # proj-sys = { version = "0.26.0", features = ["bundled_proj"] }
-proj-sys = { git = "https://github.com/drewhk/proj", branch = "bundled-sqlite" }
+proj-sys = { git = "https://github.com/GyurkovicsFeri/proj", branch = "test" }
 libsqlite3-sys = { version = ">=0.28.0,<0.36", features = [
     "bundled",
 ] }
