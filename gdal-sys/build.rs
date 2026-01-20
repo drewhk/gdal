@@ -32,24 +32,33 @@ pub fn write_bindings(include_paths: Vec<String>, out_path: &Path) {
             .clang_arg("-fretain-comments-from-system-headers");
     }
 
-    let ndk_path = env::var("ANDROID_NDK").expect("ANDROID_NDK not set");
     let target = env::var("TARGET").expect("TARGET not set");
-    let host = env::var("HOST").expect("OS not set");
-    let host_parts: Vec<&str> = host.split("-").collect();
 
     if target.contains("android") {
+        let ndk_path = env::var("ANDROID_NDK_HOME")
+            .or_else(|_| env::var("ANDROID_NDK"))
+            .expect("ANDROID_NDK_HOME or ANDROID_NDK must be set for Android builds");
+
+        let host = env::var("HOST").expect("HOST not set");
+        let host_parts: Vec<&str> = host.split("-").collect();
+
         let os = std::env::consts::OS;
-        let llvm_bindir = if os == "macos" {
-            format!("{}/toolchains/llvm/prebuilt/darwin-x86_64/bin", ndk_path)
+        let host_tag = if os == "macos" {
+            "darwin-x86_64".to_string()
         } else {
-            format!(
-                "{}/toolchains/llvm/prebuilt/{}-{}/bin",
-                ndk_path, os, host_parts[0]
-            )
+            format!("{}-{}", os, host_parts[0])
         };
 
-        eprintln!("LIBCLANG_PATH={}", llvm_bindir);
-        eprintln!("sysroot={}", llvm_bindir.replace("/bin", ""));
+        eprintln!("Running on host {}", host_tag);
+
+        let llvm_bindir = format!(
+            "{}/toolchains/llvm/prebuilt/{}/bin",
+            ndk_path, host_tag
+        );
+        let sysroot_base = format!(
+            "{}/toolchains/llvm/prebuilt/{}",
+            ndk_path, host_tag
+        );
 
         println!("cargo:rustc-env=LIBCLANG_PATH={}", llvm_bindir);
         println!("cargo:rustc-env=CLANG_PATH={}", llvm_bindir);
@@ -57,23 +66,26 @@ pub fn write_bindings(include_paths: Vec<String>, out_path: &Path) {
 
         let triple = match target.as_str() {
             t if t.contains("aarch64") => "aarch64-linux-android",
-            t if t.contains("armv7") => "arm-linux-androideabi",
+            t if t.contains("armv7") => "armv7a-linux-androideabi",
             t if t.contains("i686") => "i686-linux-android",
             t if t.contains("x86_64") => "x86_64-linux-android",
             _ => panic!("Unsupported Android target: {}", target),
         };
 
-        let sysroot_base = llvm_bindir.replace("/bin", "");
-        let clang_include = format!("{}/lib/clang/21/include", sysroot_base);
-        let sysroot_triple_include = format!("{}/sysroot/usr/include/{}", sysroot_base, triple);
+        let sysroot = format!("{}/sysroot", sysroot_base);
+        let sysroot_include = format!("{}/usr/include", sysroot);
+        let sysroot_triple_include = format!("{}/usr/include/{}", sysroot, triple);
+
+        eprintln!("target={}", triple);
+        eprintln!("sysroot={}", sysroot);
+        eprintln!("sysroot_include={}", sysroot_include);
+        eprintln!("sysroot_triple_include={}", sysroot_triple_include);
 
         builder = builder
-            .clang_arg(format!("--target={}", target))
-            .clang_arg(format!("--sysroot={}/sysroot", sysroot_base))
-            .clang_arg(format!("-I{}/sysroot/usr/include", sysroot_base))
-            .clang_arg(format!("-I{}", sysroot_triple_include))
-            .clang_arg(format!("-I{}/asm", sysroot_triple_include))
-            .clang_arg(format!("-I{}", clang_include));
+            .clang_arg(format!("--target={}", triple))
+            .clang_arg(format!("--sysroot={}", sysroot))
+            .clang_arg(format!("-I{}", sysroot_include))
+            .clang_arg(format!("-I{}", sysroot_triple_include));
     }
 
     builder
