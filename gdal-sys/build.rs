@@ -32,48 +32,131 @@ pub fn write_bindings(include_paths: Vec<String>, out_path: &Path) {
             .clang_arg("-fretain-comments-from-system-headers");
     }
 
-    let ndk_path = env::var("ANDROID_NDK").expect("ANDROID_NDK not set");
     let target = env::var("TARGET").expect("TARGET not set");
-    let host = env::var("HOST").expect("OS not set");
-    let host_parts: Vec<&str> = host.split("-").collect();
 
     if target.contains("android") {
+        let ndk_path = env::var("ANDROID_NDK_HOME")
+            .or_else(|_| env::var("ANDROID_NDK"))
+            .expect("ANDROID_NDK_HOME or ANDROID_NDK must be set for Android builds");
+
+        let host = env::var("HOST").expect("HOST not set");
+        let host_parts: Vec<&str> = host.split("-").collect();
+
         let os = std::env::consts::OS;
-        let llvm_bindir = if os == "macos" {
-            format!("{}/toolchains/llvm/prebuilt/darwin-x86_64/bin", ndk_path)
+        let arch = std::env::consts::ARCH;
+
+        let host_tag = if os == "macos" {
+            if arch == "aarch64" || arch == "arm64" {
+                let ndk_base = PathBuf::from(&ndk_path);
+                let arm64_path = ndk_base
+                    .join("toolchains")
+                    .join("llvm")
+                    .join("prebuilt")
+                    .join("darwin-aarch64");
+
+                if arm64_path.exists() {
+                    "darwin-aarch64".to_string()
+                } else {
+                    eprintln!("Warning: Using x86_64 NDK toolchain on Apple Silicon (Rosetta 2 required)");
+                    "darwin-x86_64".to_string()
+                }
+            } else {
+                "darwin-x86_64".to_string()
+            }
         } else {
-            format!(
-                "{}/toolchains/llvm/prebuilt/{}-{}/bin",
-                ndk_path, os, host_parts[0]
-            )
+            format!("{}-{}", os, host_parts[0])
         };
 
-        eprintln!("LIBCLANG_PATH={}", llvm_bindir);
-        eprintln!("sysroot={}", llvm_bindir.replace("/bin", ""));
+        eprintln!("Running on host {}", host_tag);
 
-        println!("cargo:rustc-env=LIBCLANG_PATH={}", llvm_bindir);
-        println!("cargo:rustc-env=CLANG_PATH={}", llvm_bindir);
+        let ndk_base = PathBuf::from(&ndk_path);
+        let sysroot_base = ndk_base
+            .join("toolchains")
+            .join("llvm")
+            .join("prebuilt")
+            .join(&host_tag);
+
+        if !sysroot_base.exists() {
+            panic!(
+                "NDK toolchain not found at: {}\nPlease check your ANDROID_NDK_HOME/ANDROID_NDK path and host architecture.",
+                sysroot_base.display()
+            );
+        }
+
+        let llvm_bindir = sysroot_base.join("bin");
+        let clang_ext = if cfg!(windows) { ".exe" } else { "" };
+        let clang_path = llvm_bindir.join(format!("clang{}", clang_ext));
+
+        println!("cargo:rustc-env=LIBCLANG_PATH={}", llvm_bindir.display());
+        println!("cargo:rustc-env=CLANG_PATH={}", clang_path.display());
         println!("cargo:rerun-if-changed=wrapper.h");
 
-        let triple = match target.as_str() {
-            t if t.contains("aarch64") => "aarch64-linux-android",
-            t if t.contains("armv7") => "arm-linux-androideabi",
-            t if t.contains("i686") => "i686-linux-android",
-            t if t.contains("x86_64") => "x86_64-linux-android",
+        let (clang_target, include_target) = match target.as_str() {
+            t if t.contains("aarch64") => ("aarch64-linux-android", "aarch64-linux-android"),
+            t if t.contains("armv7") => ("armv7a-linux-androideabi", "arm-linux-androideabi"),
+            t if t.contains("i686") => ("i686-linux-android", "i686-linux-android"),
+            t if t.contains("x86_64") => ("x86_64-linux-android", "x86_64-linux-android"),
             _ => panic!("Unsupported Android target: {}", target),
         };
 
-        let sysroot_base = llvm_bindir.replace("/bin", "");
-        let clang_include = format!("{}/lib/clang/21/include", sysroot_base);
-        let sysroot_triple_include = format!("{}/sysroot/usr/include/{}", sysroot_base, triple);
+        let sysroot = sysroot_base.join("sysroot");
+        let sysroot_include = sysroot.join("usr").join("include");
+        let sysroot_triple_include = sysroot_include.join(include_target);
+
+        let clang_version = detect_clang_version(&sysroot_base)
+            .unwrap_or_else(|| {
+                eprintln!("Warning: Could not detect Clang version, using common paths only");
+                String::new()
+            });
+
+        eprintln!("target={}", clang_target, );
+        eprintln!("sysroot={}", sysroot.display());
+        eprintln!("sysroot_include={}", sysroot_include.display());
+        eprintln!("sysroot_triple_include={}", sysroot_triple_include.display());
+
+        if !sysroot.exists() {
+            panic!("Sysroot not found at: {}", sysroot.display());
+        }
+        if !sysroot_include.exists() {
+            panic!("Sysroot include directory not found at: {}", sysroot_include.display());
+        }
+        if !sysroot_triple_include.exists() {
+            panic!(
+                "Architecture-specific include directory not found at: {}\n\
+                 This may indicate an unsupported target or incorrect NDK installation.",
+                sysroot_triple_include.display()
+            );
+        }
+
+        let clang_builtin_include = sysroot_base
+            .join("lib")
+            .join("clang")
+            .join(&clang_version)
+            .join("include");
+
+        let sysroot_triple_asm = sysroot_triple_include.join("asm");
+
+        if !clang_builtin_include.exists() {
+            panic!(
+                "Clang builtin headers not found at: {}\nDetected version: {}",
+                clang_builtin_include.display(),
+                clang_version
+            );
+        }
+
+        let android_api_level = env::var("FORGEO_GDAL_ANDROID_PLATFORM")
+            .ok()
+            .map(|p| p.replace("android-", ""))
+            .unwrap_or("21".to_string());
 
         builder = builder
-            .clang_arg(format!("--target={}", target))
-            .clang_arg(format!("--sysroot={}/sysroot", sysroot_base))
-            .clang_arg(format!("-I{}/sysroot/usr/include", sysroot_base))
-            .clang_arg(format!("-I{}", sysroot_triple_include))
-            .clang_arg(format!("-I{}/asm", sysroot_triple_include))
-            .clang_arg(format!("-I{}", clang_include));
+            .clang_arg(format!("--target={}{}", clang_target, android_api_level))
+            .clang_arg(format!("--sysroot={}", sysroot.display()))
+            .clang_arg(format!("-I{}", clang_builtin_include.display()))
+            .clang_arg(format!("-I{}", sysroot_triple_include.display()))
+            .clang_arg(format!("-I{}", sysroot_triple_asm.display()))
+            .clang_arg(format!("-I{}", sysroot_include.display()))
+            .clang_arg(format!("-resource-dir={}", sysroot_base.join("lib").join("clang").join(&clang_version).display()));
     }
 
     builder
@@ -81,6 +164,27 @@ pub fn write_bindings(include_paths: Vec<String>, out_path: &Path) {
         .expect("Unable to generate bindings")
         .write_to_file(out_path)
         .expect("Unable to write bindings to file");
+}
+
+fn detect_clang_version(sysroot_base: &Path) -> Option<String> {
+    let clang_lib_path = sysroot_base.join("lib").join("clang");
+
+    if let Ok(entries) = std::fs::read_dir(&clang_lib_path) {
+        for entry in entries.flatten() {
+            if let Ok(file_type) = entry.file_type() {
+                if file_type.is_dir() {
+                    if let Some(name) = entry.file_name().to_str() {
+                        if name.chars().next().map_or(false, |c| c.is_ascii_digit()) {
+                            eprintln!("Detected Clang version: {}", name);
+                            return Some(name.to_string());
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    None
 }
 
 fn env_dir(var: &str) -> Option<PathBuf> {
