@@ -336,7 +336,8 @@ fn main() {
         config.define("GEOS_LIBRARY", print_path(&lib_path));
     }
 
-    if cfg!(target_env = "msvc") {
+    // Build scripts run on the host; these settings belong to the target.
+    if std::env::var("CARGO_CFG_TARGET_ENV").as_deref() == Ok("msvc") {
         // otherwise there are linking issues
         // because rust always links the
         // MSVC release runtime
